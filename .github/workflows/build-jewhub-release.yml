@@ -1,0 +1,60 @@
+name: Build and publish Jewhub APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release repository
+        uses: actions/checkout@v4
+
+      - name: Check out Jewhub source
+        uses: actions/checkout@v4
+        with:
+          repository: Fred-Systems/Jewhub
+          ref: main
+          path: source
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: source/gradle/libs.versions.toml
+
+      - name: Build release APK
+        working-directory: source
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon assembleRelease
+
+      - name: Prepare release asset
+        run: |
+          test -f source/app/build/outputs/apk/release/app-release.apk
+          cp source/app/build/outputs/apk/release/app-release.apk Jewhub-v1.10.19.apk
+          sha256sum Jewhub-v1.10.19.apk
+
+      - name: Publish v1.10.19 to this release repository only
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.10.19
+          target_commitish: ${{ github.sha }}
+          name: Jewhub v1.10.19
+          body: |
+            Jewhub v1.10.19
+
+            Includes chronological status playback and hold-to-pause, NexText Lite download access, and per-user Jewhub usage limits and restriction controls.
+          files: Jewhub-v1.10.19.apk
+          draft: false
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
